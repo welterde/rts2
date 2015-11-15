@@ -165,8 +165,9 @@ void Reinhardt::syncTime ()
 	lcltime = localtime (&now);
 
 	char buf[20];
-	sprintf(buf, "\n!U%02d%02d%02d%02d%02d%02d\n", lcltime->tm_hour, lcltime->tm_min, lcltime->tm_sec, lcltime->tm_mday, lcltime->tm_mon, lcltime->tm_year);
+	sprintf(buf, "!U%02d%02d%02d%02d%02d%02d\r\n", lcltime->tm_hour, lcltime->tm_min, lcltime->tm_sec, lcltime->tm_mday, lcltime->tm_mon + 1, lcltime->tm_year % 100);
 	reinhardtConn->writePort(buf, 16);
+	reinhardtConn->flushPortO();
 }
 
 void Reinhardt::selectSuccess (fd_set &read_set, fd_set &write_set, fd_set &exp_set)
