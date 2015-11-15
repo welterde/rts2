@@ -44,8 +44,11 @@ class Reinhardt:public SensorWeather
 		virtual int processOption (int opt);
 		virtual int initHardware ();
 		virtual bool isGoodWeather ();
+
+	virtual void writeStateFile ();
 	private:
 		char *device_file;
+	        char *state_file;
 		rts2core::ConnSerial *reinhardtConn;
 
 		std::map <std::string, rts2core::ValueDouble *> reinhardtValues;
@@ -118,10 +121,12 @@ Reinhardt::Reinhardt (int argc, char **argv):SensorWeather (argc, argv)
 {
 	device_file = NULL;
 	reinhardtConn = NULL;
+	state_file = NULL;
 
 	lastReceivedChar = 0;
 
 	addOption ('f', NULL, 1, "serial port with the module (ussually /dev/ttyUSB for ThorLaser USB serial connection");
+	addOption ('s', "state-file", 1, "File to write current line from serial port to");
 }
 
 Reinhardt::~Reinhardt ()
@@ -133,6 +138,19 @@ void Reinhardt::addSelectSocks (fd_set &read_set, fd_set &write_set, fd_set &exp
 {
 	reinhardtConn->add (&read_set, &write_set, &exp_set);
 	SensorWeather::addSelectSocks (read_set, write_set, exp_set);
+}
+
+void Reinhardt::writeStateFile ()
+{
+	if (state_file != NULL) {
+		std::ofstream out (state_file, std::ios::out | std::ios::trunc);
+		if (out) {
+			out << dataBuff;
+		} else {
+			// TODO: log warning
+		}
+		out.close ();
+	}
 }
 
 void Reinhardt::selectSuccess (fd_set &read_set, fd_set &write_set, fd_set &exp_set)
@@ -148,6 +166,10 @@ void Reinhardt::selectSuccess (fd_set &read_set, fd_set &write_set, fd_set &exp_
 		if (ret > 0 && dataBuff[lastReceivedChar + ret - 1] == '\n')
 		{
 			dataBuff[lastReceivedChar + ret] = '\0';
+
+                        writeStateFile ();
+                        
+                        // parse time
 			struct tm lastInfoTime;
 			ret = sscanf (dataBuff, "%d:%d:%d, %d.%d.%d", &lastInfoTime.tm_hour, &lastInfoTime.tm_min, &lastInfoTime.tm_sec, &lastInfoTime.tm_mday, &lastInfoTime.tm_mon, &lastInfoTime.tm_year);
 			if (ret != 6)
@@ -239,6 +261,9 @@ int Reinhardt::processOption (int opt)
 	{
 		case 'f':
 			device_file = optarg;
+			break;
+	        case 's':
+			state_file = optarg;
 			break;
 		default:
 			return SensorWeather::processOption (opt);
