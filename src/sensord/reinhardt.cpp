@@ -46,9 +46,11 @@ class Reinhardt:public SensorWeather
 		virtual bool isGoodWeather ();
 
 	virtual void writeStateFile ();
+	virtual void syncTime ();
 	private:
 		char *device_file;
 	        char *state_file;
+	        bool sync_time;
 		rts2core::ConnSerial *reinhardtConn;
 
 		std::map <std::string, rts2core::ValueDouble *> reinhardtValues;
@@ -122,11 +124,13 @@ Reinhardt::Reinhardt (int argc, char **argv):SensorWeather (argc, argv)
 	device_file = NULL;
 	reinhardtConn = NULL;
 	state_file = NULL;
+	sync_time = false;
 
 	lastReceivedChar = 0;
 
 	addOption ('f', NULL, 1, "serial port with the module (ussually /dev/ttyUSB for ThorLaser USB serial connection");
 	addOption ('s', "state-file", 1, "File to write current line from serial port to");
+        addOption ('y', "sync-time", 0, "Synchronize time of weather station to local machine");
 }
 
 Reinhardt::~Reinhardt ()
@@ -151,6 +155,18 @@ void Reinhardt::writeStateFile ()
 		}
 		out.close ();
 	}
+}
+
+void Reinhardt::syncTime ()
+{
+	time_t now;
+	struct tm *lcltime;
+	now = time (NULL);
+	lcltime = localtime (&now);
+
+	char buf[20];
+	sprintf(buf, "!U%02d%02d%02d%02d%02d%02d\n", lcltime->tm_hour, lcltime->tm_min, lcltime->tm_sec, lcltime->tm_mday, lcltime->tm_mon, lcltime->tm_year);
+	reinhardtConn->writePort(buf, 15);
 }
 
 void Reinhardt::selectSuccess (fd_set &read_set, fd_set &write_set, fd_set &exp_set)
@@ -265,6 +281,9 @@ int Reinhardt::processOption (int opt)
 	        case 's':
 			state_file = optarg;
 			break;
+	        case 'y':
+			sync_time = true;
+			break;
 		default:
 			return SensorWeather::processOption (opt);
 	}
@@ -284,6 +303,12 @@ int Reinhardt::initHardware ()
 	if (ret)
 		return ret;
 	reinhardtConn->setDebug (getDebug ());
+
+	if (sync_time)
+	{
+		syncTime ();
+	}
+	
 	reinhardtConn->writePort ('?');
 	return ret;
 }
